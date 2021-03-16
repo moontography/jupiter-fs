@@ -1,0 +1,31 @@
+{
+  "name": "jupiter-fs",
+  "version": "0.0.1",
+  "description": "A small file system implementation for the Jupiter blockchain.",
+  "main": "./dist/JupiterFs.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whatl3y/jupiter-fs"
+  },
+  "scripts": {
+    "build": "npx tsc",
+    "prepublish": "npm run build",
+    "test": "mocha --exit --require ts-node/register --recursive './src/**/*.spec.ts'"
+  },
+  "author": "Lance Whatley <whatl3y@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/mocha": "^8.2.1",
+    "@types/node": "^14.14.8",
+    "mocha": "^8.3.0",
+    "ts-node": "^9.1.1",
+    "typescript": "^4.0.5"
+  },
+  "dependencies": {
+    "jupiter-node-sdk": "^0.0.8"
+  },
+  "keywords": [
+    "blockchain",
+    "jupiter"
+  ]
+}
