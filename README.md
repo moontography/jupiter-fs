@@ -27,12 +27,19 @@ await jupFs.writeFile('myFile.txt', Buffer.from('jupToTheMoon'))
 // get binary data of file contents
 const buffer = await jupFs.getFile({ name: 'myFile.txt' })
 // OR
-const buffer = await jupFs.getFile({ transaction: '1234567890' })
+const buffer = await jupFs.getFile({
+  id: '123e4567-e89b-42d3-a456-556642440000',
+})
 // NOTE that if you fetch a file by name and there are multiple files
 // with the same name, jupiter-fs will get the first one it finds and
 // stop looking. Therefore, you should name files distinctly and/or
-// use the transaction ID to fetch paticular files since it's
-// guaranteed to be unique per file.
+// use the file ID to fetch paticular files since it's
+// guaranteed to be unique per file. Every file that's stored
+// is assigned a UUID in the ID field of the master record you can
+// use here if you wish.
+
+// delete the file by providing the file ID (UUID assigned originally)
+await jupFs.deleteFile('123e4567-e89b-42d3-a456-556642440000')
 ```
 
 # Tips w/ cryptocurrency

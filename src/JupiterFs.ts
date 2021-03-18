@@ -1,4 +1,5 @@
 import assert from 'assert'
+import { v1 as uuidv1 } from 'uuid'
 import JupiterClient, { generatePassphrase } from 'jupiter-node-sdk'
 
 export default function JupiterFs({
@@ -68,27 +69,37 @@ export default function JupiterFs({
 
     async getBinaryAddress() {
       const allTxns = await this.client.getAllTransactions()
-      const binaryAccountInfo = await Promise.all(
-        allTxns.map(async (txn: any) => {
-          try {
-            const decryptedMessage = await this.client.decryptRecord(
-              txn.attachment.encryptedMessage
-            )
-            let data = JSON.parse(await this.client.decrypt(decryptedMessage))
-            if (!data[this.metaDataKey]) return false
+      const binaryAccountInfo: any = (
+        await Promise.all(
+          allTxns.map(async (txn: any) => {
+            try {
+              const decryptedMessage = await this.client.decryptRecord(
+                txn.attachment.encryptedMessage
+              )
+              let data = JSON.parse(await this.client.decrypt(decryptedMessage))
+              if (!data[this.metaDataKey]) return false
 
-            return { transaction: txn.transaction, ...data }
-          } catch (err) {
-            return false
-          }
-        })
+              return { transaction: txn.transaction, ...data }
+            } catch (err) {
+              return false
+            }
+          })
+        )
       )
-      return binaryAccountInfo.find((i) => i)
+        .filter((r) => !!r)
+        .reduce(
+          (obj: any, file: any) => ({
+            ...obj,
+            [file.id]: { ...obj[file.id], ...file },
+          }),
+          {}
+        )
+      return Object.values(binaryAccountInfo).find((r: any) => !r.isDeleted)
     },
 
     async ls() {
       const allTxns = await this.client.getAllTransactions()
-      return (
+      const allFilesObj: any = (
         await Promise.all(
           allTxns.map(async (txn: any) => {
             try {
@@ -104,7 +115,16 @@ export default function JupiterFs({
             }
           })
         )
-      ).filter((r: any) => r && !r[this.metaDataKey])
+      )
+        .filter((r: any) => r && !r[this.metaDataKey])
+        .reduce(
+          (obj: any, file: any) => ({
+            ...obj,
+            [file.id]: { ...obj[file.id], ...file },
+          }),
+          {}
+        )
+      return Object.values(allFilesObj).filter((r: any) => !r.isDeleted)
     },
 
     async writeFile(
@@ -129,6 +149,7 @@ export default function JupiterFs({
 
       const masterRecord = {
         [this.key]: true,
+        id: uuidv1(),
         fileName: name,
         fileSize: data.length,
         txns: await this.client.encrypt(JSON.stringify(dataTxns)),
@@ -138,19 +159,23 @@ export default function JupiterFs({
       return masterRecord
     },
 
+    async deleteFile(id: string): Promise<boolean> {
+      await this.client.storeRecord({ id, isDeleted: true })
+      return true
+    },
+
     /**
      *
-     * @param { name, transaction }: Either the name of a file or a transaction ID to fetch file data.
+     * @param { name, id }: Either the name of a file or an ID to fetch file data.
      * If a file name is provided, it will find the first file it can with the name. Therefore, if you have
-     * multiple files with the same name you should use the transaction field to get the file.
+     * multiple files with the same name you should use the id field to get the file.
      * @returns Buffer of raw file data
      */
-    async getFile({ name, transaction }: any): Promise<Buffer> {
+    async getFile({ name, id }: any): Promise<Buffer> {
       await this.getOrCreateBinaryAddress()
-      const txns = await this.ls()
-      const targetFile = txns.find(
-        (t: any) =>
-          (transaction && transaction === t.transaction) || t.fileName === name
+      const files = await this.ls()
+      const targetFile = files.find(
+        (t: any) => (id && id === t.id) || t.fileName === name
       )
       assert(targetFile, 'target file was not found')
       const dataTxns = JSON.parse(await this.client.decrypt(targetFile.txns))
