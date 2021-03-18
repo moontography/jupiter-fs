@@ -38,6 +38,10 @@ const buffer = await jupFs.getFile({
 // is assigned a UUID in the ID field of the master record you can
 // use here if you wish.
 
+// you can also get the file as a Readable stream to pipe to
+// or be piped other streams
+await readStream = await jupFs.getFileStream({ name: 'myFile.txt' })
+
 // delete the file by providing the file ID (UUID assigned originally)
 await jupFs.deleteFile('123e4567-e89b-42d3-a456-556642440000')
 ```

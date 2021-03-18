@@ -1,4 +1,5 @@
 import assert from 'assert'
+import { Readable } from 'stream'
 import { v1 as uuidv1 } from 'uuid'
 import JupiterClient, { generatePassphrase } from 'jupiter-node-sdk'
 
@@ -171,7 +172,10 @@ export default function JupiterFs({
      * multiple files with the same name you should use the id field to get the file.
      * @returns Buffer of raw file data
      */
-    async getFile({ name, id }: any): Promise<Buffer> {
+    async getFile(
+      { name, id }: any,
+      isReadStream: boolean = false
+    ): Promise<Buffer | Readable> {
       await this.getOrCreateBinaryAddress()
       const files = await this.ls()
       const targetFile = files.find(
@@ -179,23 +183,48 @@ export default function JupiterFs({
       )
       assert(targetFile, 'target file was not found')
       const dataTxns = JSON.parse(await this.client.decrypt(targetFile.txns))
-      const base64Strings: string[] = await Promise.all(
-        dataTxns.map(async (txnId: string) => {
-          const { data } = await this.binaryClient.request('post', '/nxt', {
-            params: {
-              requestType: 'readMessage',
-              secretPhrase: encryptSecret || this.binaryClient.passphrase,
-              transaction: txnId,
-            },
+      const readable = new Readable()
+
+      const getBase64Strings = async (
+        readableStream?: Readable
+      ): Promise<string[]> => {
+        const allBase64Strings: string[] = await Promise.all(
+          dataTxns.map(async (txnId: string) => {
+            const { data } = await this.binaryClient.request('post', '/nxt', {
+              params: {
+                requestType: 'readMessage',
+                secretPhrase: encryptSecret || this.binaryClient.passphrase,
+                transaction: txnId,
+              },
+            })
+            if (data.errorCode > 0) throw new Error(JSON.stringify(data))
+            const jsonWithData = await this.binaryClient.decrypt(
+              data.decryptedMessage
+            )
+
+            const base64Chunk = JSON.parse(jsonWithData).data
+            if (readableStream)
+              readableStream.push(Buffer.from(base64Chunk, 'base64'))
+            return base64Chunk
           })
-          if (data.errorCode > 0) throw new Error(JSON.stringify(data))
-          const jsonWithData = await this.binaryClient.decrypt(
-            data.decryptedMessage
-          )
-          return JSON.parse(jsonWithData).data
-        })
-      )
+        )
+        if (readableStream) readableStream.push(null)
+        return allBase64Strings
+      }
+
+      if (isReadStream) {
+        readable._read = async () => {
+          await getBase64Strings(readable)
+        }
+        return readable
+      }
+
+      const base64Strings = await getBase64Strings()
       return Buffer.from(base64Strings.join(''), 'base64')
+    },
+
+    async getFileStream({ name, id }: any): Promise<Readable> {
+      return await this.getFile({ name, id }, true)
     },
 
     async newBinaryAddress() {
