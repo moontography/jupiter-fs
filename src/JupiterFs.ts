@@ -154,8 +154,8 @@ export default function JupiterFs({
 
       const dataTxns: string[] = await Promise.all(
         chunks.map(async (str) => {
-          await this.checkAndFundAccount(this.binaryClient.address)
           const { transaction } = await exponentialBackoff(async () => {
+            await this.checkAndFundAccount(this.binaryClient.address)
             return await this.binaryClient.storeRecord({
               data: str,
             })
