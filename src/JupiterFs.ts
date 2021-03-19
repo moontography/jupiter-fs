@@ -1,4 +1,5 @@
 import assert from 'assert'
+import BigNumber from 'bignumber.js'
 import { Readable } from 'stream'
 import { v1 as uuidv1 } from 'uuid'
 import JupiterClient, { generatePassphrase } from 'jupiter-node-sdk'
@@ -48,7 +49,6 @@ export default function JupiterFs({
           account,
           passphrase,
         } = await this.newBinaryAddress()
-        await this.client.sendMoney(address)
 
         const newAddyInfo = {
           [this.key]: true,
@@ -64,8 +64,23 @@ export default function JupiterFs({
         await this.client.storeRecord(newAddyInfo)
         addy = newAddyInfo
       }
+      await this.checkAndFundAccount(addy.address)
       this.binaryClient = JupiterClient({ ...addy, server: jupServer, feeNQT })
       return addy
+    },
+
+    async checkAndFundAccount(targetAddress: string) {
+      const balanceJup = await this.client.getBalance(targetAddress)
+      if (
+        !balanceJup ||
+        new BigNumber(balanceJup).lt(
+          new BigNumber(
+            this.client.nqtToJup(this.client.config.minimumFndrAccountBalance)
+          ).div(2)
+        )
+      ) {
+        await this.client.sendMoney(targetAddress)
+      }
     },
 
     async getBinaryAddress() {
