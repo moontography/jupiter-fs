@@ -193,6 +193,7 @@ export default function JupiterFs({
       isReadStream: boolean = false
     ): Promise<Buffer | Readable> {
       await this.getOrCreateBinaryAddress()
+      const unconfTxns = await this.binaryClient.getAllUnconfirmedTransactions()
       const files = await this.ls()
       const targetFile = files.find(
         (t: any) => (id && id === t.id) || t.fileName === name
@@ -204,24 +205,37 @@ export default function JupiterFs({
       const getBase64Strings = async (
         readableStream?: Readable
       ): Promise<string[]> => {
+        const getBase64Chunk = async (decryptedMessage: string) => {
+          const jsonWithData = await this.binaryClient.decrypt(decryptedMessage)
+          const base64Chunk = JSON.parse(jsonWithData).data
+          if (readableStream)
+            readableStream.push(Buffer.from(base64Chunk, 'base64'))
+          return base64Chunk
+        }
+
         const allBase64Strings: string[] = await Promise.all(
           dataTxns.map(async (txnId: string) => {
-            const { data } = await this.binaryClient.request('post', '/nxt', {
-              params: {
-                requestType: 'readMessage',
-                secretPhrase: encryptSecret || this.binaryClient.passphrase,
-                transaction: txnId,
-              },
-            })
-            if (data.errorCode > 0) throw new Error(JSON.stringify(data))
-            const jsonWithData = await this.binaryClient.decrypt(
-              data.decryptedMessage
-            )
+            try {
+              const { data } = await this.binaryClient.request('post', '/nxt', {
+                params: {
+                  requestType: 'readMessage',
+                  secretPhrase: encryptSecret || this.binaryClient.passphrase,
+                  transaction: txnId,
+                },
+              })
+              if (data.errorCode > 0) throw new Error(JSON.stringify(data))
+              return await getBase64Chunk(data.decryptedMessage)
+            } catch (err) {
+              const txn = unconfTxns.find(
+                (txn: any) => txn.transaction === txnId
+              )
+              if (!txn) throw new Error(`target file was not found`)
 
-            const base64Chunk = JSON.parse(jsonWithData).data
-            if (readableStream)
-              readableStream.push(Buffer.from(base64Chunk, 'base64'))
-            return base64Chunk
+              const decryptedMessage = await this.binaryClient.decryptRecord(
+                txn.attachment.encryptedMessage
+              )
+              return await getBase64Chunk(decryptedMessage)
+            }
           })
         )
         if (readableStream) readableStream.push(null)
