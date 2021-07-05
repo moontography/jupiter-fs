@@ -193,11 +193,20 @@ export default function JupiterFs({
       isReadStream: boolean = false
     ): Promise<Buffer | Readable> {
       await this.getOrCreateBinaryAddress()
-      const unconfTxns = await this.binaryClient.getAllUnconfirmedTransactions()
+      let txns = await this.binaryClient.getAllUnconfirmedTransactions()
       const files = await this.ls()
       const targetFile = files.find(
         (t: any) => (id && id === t.id) || t.fileName === name
       )
+
+      if (!targetFile){
+        txns = await this.binaryClient.getAllConfirmedTransactions()
+        const files = await this.ls()
+        const targetFile = files.find(
+          (t: any) => (id && id === t.id) || t.fileName === name
+        )
+      }
+
       assert(targetFile, 'target file was not found')
       const dataTxns = JSON.parse(await this.client.decrypt(targetFile.txns))
       const readable = new Readable()
@@ -226,7 +235,7 @@ export default function JupiterFs({
               if (data.errorCode > 0) throw new Error(JSON.stringify(data))
               return await getBase64Chunk(data.decryptedMessage)
             } catch (err) {
-              const txn = unconfTxns.find(
+              const txn = txns.find(
                 (txn: any) => txn.transaction === txnId
               )
               if (!txn) throw new Error(`target file was not found`)
