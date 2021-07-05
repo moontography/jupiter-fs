@@ -10,37 +10,31 @@ import JupiterFs from './JupiterFs'
  * polluting accounts and data on mainnet
  */
 describe('JupiterFs', function() {
-  this.timeout(10000)
+  this.timeout(40000)
 
-  assert(process.env.JUPITER_ADDRESS, 'JUPITER_ADDRESS env variable is not set')
-  assert(
-    process.env.JUPITER_PASSPHRASE,
-    'JUPITER_PASSPHRASE env variable is not set'
-  )
-
-  // const fs = JupiterFs({ server: 'http://localhost:7876' })
-  const jupFs = JupiterFs({
-    server: process.env.JUPITER_SERVER || 'https://jpr4.gojupiter.tech',
-    address: process.env.JUPITER_ADDRESS,
-    passphrase: process.env.JUPITER_PASSPHRASE,
-  })
+ // const fs = JupiterFs({ server: 'http://localhost:7876' })
+ const jupFs = JupiterFs({
+  server: 'http://localhost:6876',
+  address: 'JUP-LSAP-P95M-LVMA-HZD7M',
+  passphrase: 'across sign made size scream thousand princess dreamer certainly complain leaf footstep',
+});
   const testFilename = `${uuidv1()}.js`
 
-  describe('#newBinaryAddress()', function() {
+  xdescribe('#newBinaryAddress()', function() {
     it(`should get a new JUP address from a passphrase`, async () => {
       const info = await jupFs.newBinaryAddress()
       assert.strictEqual(info.address.slice(0, 4), 'JUP-')
     })
   })
 
-  describe('#getOrCreateBinaryAddress()', function() {
+  xdescribe('#getOrCreateBinaryAddress()', function() {
     it(`should get the binary address info to store file data`, async function() {
       const addy = await jupFs.getOrCreateBinaryAddress()
       assert.strictEqual(typeof addy.address === 'string', true)
     })
   })
 
-  describe('#ls()', function() {
+  xdescribe('#ls()', function() {
     it(`should fetch a list of files for a jupiter account`, async () => {
       const files = await jupFs.ls()
       assert.strictEqual(files instanceof Array, true)
@@ -53,6 +47,7 @@ describe('JupiterFs', function() {
         path.join(__dirname, '../testFiles/medium.jpg'),
         { encoding: null }
       )
+      console.log("filename " + testFilename);
       const res = await jupFs.writeFile(testFilename, fileData, assert.fail)
       assert.strictEqual(res.fileName, testFilename)
       assert.strictEqual(res.txns.length > 0, true)
@@ -61,6 +56,7 @@ describe('JupiterFs', function() {
 
   describe('#getFile()', function() {
     it(`should get the binary data for a file specified`, async () => {
+      console.log("filename " + testFilename);
       const fileData = await jupFs.getFile({ name: testFilename })
       const origFileData = await fs.promises.readFile(
         path.join(__dirname, '../testFiles/medium.jpg'),

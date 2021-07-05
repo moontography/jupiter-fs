@@ -10,9 +10,13 @@ export default function JupiterFs({
   passphrase,
   encryptSecret,
   feeNQT,
+  minimumFndrAccountBalance,
+  minimumUserAccountBalance
 }: any): any {
   const jupServer = server || 'https://jpr.gojupiter.tech'
   feeNQT = feeNQT || 6500
+  minimumFndrAccountBalance = minimumFndrAccountBalance || 100000
+  minimumUserAccountBalance = minimumUserAccountBalance || 200000
 
   return {
     key: `jupiter-fs`,
@@ -23,6 +27,8 @@ export default function JupiterFs({
       passphrase,
       encryptSecret,
       feeNQT,
+      minimumFndrAccountBalance,
+      minimumUserAccountBalance
     }),
     binaryClient: null,
 
@@ -38,6 +44,8 @@ export default function JupiterFs({
           passphrase: this.binaryClient.passphrase,
           encryptSecret: this.binaryClient.encryptSecret,
           feeNQT,
+          minimumFndrAccountBalance: this.binaryClient.minimumFndrAccountBalance,
+          minimumUserAccountBalance: this.binaryClient.minimumUserAccountBalance
         }
       }
 
@@ -65,11 +73,16 @@ export default function JupiterFs({
         addy = newAddyInfo
       }
       await this.checkAndFundAccount(addy.address)
-      this.binaryClient = JupiterClient({ ...addy, server: jupServer, feeNQT })
+      this.binaryClient = JupiterClient({ ...addy, 
+        server: jupServer, 
+        feeNQT, 
+        minimumFndrAccountBalance, 
+        minimumUserAccountBalance })
       return addy
     },
 
     async checkAndFundAccount(targetAddress: string) {
+      // Get balance for binary client
       const balanceJup = await this.client.getBalance(targetAddress)
       if (
         !balanceJup ||
@@ -79,12 +92,20 @@ export default function JupiterFs({
           ).div(2)
         )
       ) {
+        // send money to the binary client to pay fees for transactions
         await this.client.sendMoney(targetAddress)
       }
     },
 
+    /**
+     * Get the address for the binary account used to upload files
+     * @returns 
+     */
     async getBinaryAddress() {
+      // Get all the transactions for the main jupiter account
       const allTxns = await this.client.getAllTransactions()
+      // for each transaction, check if contains the jupiter-fs metaDataKey and 
+      // decrypt the chuncked transactions
       const binaryAccountInfo: any = (
         await Promise.all(
           allTxns.map(async (txn: any) => {
@@ -93,8 +114,9 @@ export default function JupiterFs({
                 txn.attachment.encryptedMessage
               )
               let data = JSON.parse(await this.client.decrypt(decryptedMessage))
+              
+              // tx with jupiter-fs-meta:true contains info related to the binary client
               if (!data[this.metaDataKey]) return false
-
               return { transaction: txn.transaction, ...data }
             } catch (err) {
               return false
@@ -110,6 +132,7 @@ export default function JupiterFs({
           }),
           {}
         )
+
       return Object.values(binaryAccountInfo).find((r: any) => !r.isDeleted)
     },
 
@@ -149,7 +172,7 @@ export default function JupiterFs({
       errorCallback?: (err: Error) => {}
     ) {
       await this.getOrCreateBinaryAddress()
-      const chunks = data.toString('base64').match(/.{1,2000}/g)
+      const chunks = data.toString('base64').match(/.{1,3000}/g)
       assert(chunks, `we couldn't split the data into chunks`)
 
       const dataTxns: string[] = await Promise.all(
