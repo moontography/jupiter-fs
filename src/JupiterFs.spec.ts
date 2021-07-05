@@ -50,7 +50,7 @@ describe('JupiterFs', function() {
   describe('#writeFile()', function() {
     it(`should write a file to a jupiter account without error`, async () => {
       const fileData = await fs.promises.readFile(
-        path.join(__dirname, 'JupiterFs.ts'),
+        path.join(__dirname, '../testFiles/medium.jpg'),
         { encoding: null }
       )
       const res = await jupFs.writeFile(testFilename, fileData, assert.fail)
@@ -63,7 +63,7 @@ describe('JupiterFs', function() {
     it(`should get the binary data for a file specified`, async () => {
       const fileData = await jupFs.getFile({ name: testFilename })
       const origFileData = await fs.promises.readFile(
-        path.join(__dirname, 'JupiterFs.ts'),
+        path.join(__dirname, '../testFiles/medium.jpg'),
         'utf-8'
       )
       assert.strictEqual(fileData instanceof Buffer, true)

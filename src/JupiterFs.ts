@@ -12,7 +12,7 @@ export default function JupiterFs({
   feeNQT,
 }: any): any {
   const jupServer = server || 'https://jpr.gojupiter.tech'
-  feeNQT = feeNQT || 400
+  feeNQT = feeNQT || 6500
 
   return {
     key: `jupiter-fs`,
@@ -149,7 +149,7 @@ export default function JupiterFs({
       errorCallback?: (err: Error) => {}
     ) {
       await this.getOrCreateBinaryAddress()
-      const chunks = data.toString('base64').match(/.{1,1000}/g)
+      const chunks = data.toString('base64').match(/.{1,2000}/g)
       assert(chunks, `we couldn't split the data into chunks`)
 
       const dataTxns: string[] = await Promise.all(

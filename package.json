@@ -5,7 +5,7 @@
   "main": "./dist/JupiterFs.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/whatl3y/jupiter-fs"
+    "url": "https://github.com/jupiter-project/jupiter-fs"
   },
   "scripts": {
     "build": "npx tsc",
