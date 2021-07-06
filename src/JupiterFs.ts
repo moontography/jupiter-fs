@@ -13,10 +13,14 @@ export default function JupiterFs({
   minimumFndrAccountBalance,
   minimumUserAccountBalance
 }: any): any {
-  const jupServer = server || 'https://jpr.gojupiter.tech'
+  // const jupServer = server || 'https://fs.jup.io'
+  const jupServer = server || ''
   feeNQT = feeNQT || 6500
   minimumFndrAccountBalance = minimumFndrAccountBalance || 100000
   minimumUserAccountBalance = minimumUserAccountBalance || 200000
+
+  // Chunk size to split the file to upload
+  const CHUNK_SIZE_PATTERN = /.{1,20000}/g;
 
   return {
     key: `jupiter-fs`,
@@ -166,18 +170,31 @@ export default function JupiterFs({
       return Object.values(allFilesObj).filter((r: any) => !r.isDeleted)
     },
 
+    /**
+     * Push a file into the Jupiter blockchain
+     * The file is splitted into chunks of CHUNK_SIZE_PATTERN
+     * and pushed by the binary client
+     * @param name 
+     * @param data 
+     * @param errorCallback 
+     * @returns 
+     */
     async writeFile(
       name: string,
       data: Buffer,
       errorCallback?: (err: Error) => {}
     ) {
       await this.getOrCreateBinaryAddress()
-      const chunks = data.toString('base64').match(/.{1,3000}/g)
+      // TODO: compress the binary data before to base64 encode
+      const encodedFileData = data.toString('base64');
+
+      const chunks = encodedFileData.match(CHUNK_SIZE_PATTERN)
       assert(chunks, `we couldn't split the data into chunks`)
 
       const dataTxns: string[] = await Promise.all(
         chunks.map(async (str) => {
           const { transaction } = await exponentialBackoff(async () => {
+            // check if the binarclient have enought found for the transaction
             await this.checkAndFundAccount(this.binaryClient.address)
             return await this.binaryClient.storeRecord({
               data: str,
@@ -216,6 +233,8 @@ export default function JupiterFs({
       isReadStream: boolean = false
     ): Promise<Buffer | Readable> {
       await this.getOrCreateBinaryAddress()
+
+      // search first in the unconfirmed transactions
       let txns = await this.binaryClient.getAllUnconfirmedTransactions()
       const files = await this.ls()
       const targetFile = files.find(
@@ -223,6 +242,7 @@ export default function JupiterFs({
       )
 
       if (!targetFile){
+        // if not found, search in the confirmed transactions
         txns = await this.binaryClient.getAllConfirmedTransactions()
         const files = await this.ls()
         const targetFile = files.find(
@@ -231,12 +251,20 @@ export default function JupiterFs({
       }
 
       assert(targetFile, 'target file was not found')
+      
+      // decrypt the transactions info with the list of txIds where is stored the file
       const dataTxns = JSON.parse(await this.client.decrypt(targetFile.txns))
       const readable = new Readable()
 
+      /**
+       * Get the base64 chunks of the image
+       * @param readableStream 
+       * @returns 
+       */
       const getBase64Strings = async (
         readableStream?: Readable
       ): Promise<string[]> => {
+        // Decrypt the message and parse the json chunk
         const getBase64Chunk = async (decryptedMessage: string) => {
           const jsonWithData = await this.binaryClient.decrypt(decryptedMessage)
           const base64Chunk = JSON.parse(jsonWithData).data
@@ -245,6 +273,7 @@ export default function JupiterFs({
           return base64Chunk
         }
 
+        // Get the transaction info for each txId of the file
         const allBase64Strings: string[] = await Promise.all(
           dataTxns.map(async (txnId: string) => {
             try {
@@ -255,18 +284,15 @@ export default function JupiterFs({
                   transaction: txnId,
                 },
               })
-              if (data.errorCode > 0) throw new Error(JSON.stringify(data))
-              return await getBase64Chunk(data.decryptedMessage)
-            } catch (err) {
-              const txn = txns.find(
-                (txn: any) => txn.transaction === txnId
-              )
-              if (!txn) throw new Error(`target file was not found`)
+              if (data.errorCode > 0){
+                throw new Error(JSON.stringify(data))
+              } 
 
-              const decryptedMessage = await this.binaryClient.decryptRecord(
-                txn.attachment.encryptedMessage
-              )
-              return await getBase64Chunk(decryptedMessage)
+              // decrypt and decode the chunk
+              return await getBase64Chunk(data.decryptedMessage)
+
+            } catch (err) {
+              throw new Error(`target file was not found ` + JSON.stringify(err))
             }
           })
         )
@@ -282,6 +308,7 @@ export default function JupiterFs({
       }
 
       const base64Strings = await getBase64Strings()
+      // TODO uncompress before base64 decode
       return Buffer.from(base64Strings.join(''), 'base64')
     },
 
@@ -300,6 +327,17 @@ export default function JupiterFs({
   }
 }
 
+/**
+ * Function to create a exponential backoff 
+ * if there is an error, it wait for some time and if the problems contine
+ * the time to wait is increased in a exponentional way
+ * @param promiseFunction 
+ * @param failureFunction 
+ * @param err 
+ * @param totalAllowedBackoffTries 
+ * @param backoffAttempt 
+ * @returns 
+ */
 async function exponentialBackoff(
   promiseFunction: any,
   failureFunction: any = () => {},
