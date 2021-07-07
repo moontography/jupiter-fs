@@ -10,24 +10,28 @@ import JupiterFs from './JupiterFs'
  * polluting accounts and data on mainnet
  */
 describe('JupiterFs', function() {
-  this.timeout(40000)
+  assert(process.env.JUPITER_ADDRESS, 'JUPITER_ADDRESS env variable is not set')
+  assert(
+    process.env.JUPITER_PASSPHRASE,
+    'JUPITER_PASSPHRASE env variable is not set'
+  )
 
- // const fs = JupiterFs({ server: 'http://localhost:7876' })
- const jupFs = JupiterFs({
-  server: 'http://localhost:6876',
-  address: 'JUP-LSAP-P95M-LVMA-HZD7M',
-  passphrase: 'across sign made size scream thousand princess dreamer certainly complain leaf footstep',
-});
+  // const fs = JupiterFs({ server: 'http://localhost:6876' })
+  const jupFs = JupiterFs({
+    server: process.env.JUPITER_SERVER || 'http://104.131.166.136:6876/test',
+    address: process.env.JUPITER_ADDRESS,
+    passphrase: process.env.JUPITER_PASSPHRASE,
+  })
   const testFilename = `${uuidv1()}.js`
 
-  xdescribe('#newBinaryAddress()', function() {
+  describe('#newBinaryAddress()', function() {
     it(`should get a new JUP address from a passphrase`, async () => {
       const info = await jupFs.newBinaryAddress()
       assert.strictEqual(info.address.slice(0, 4), 'JUP-')
     })
   })
 
-  xdescribe('#getOrCreateBinaryAddress()', function() {
+  describe('#getOrCreateBinaryAddress()', function() {
     it(`should get the binary address info to store file data`, async function() {
       const addy = await jupFs.getOrCreateBinaryAddress()
       assert.strictEqual(typeof addy.address === 'string', true)
