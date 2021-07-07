@@ -10,17 +10,15 @@ import JupiterFs from './JupiterFs'
  * polluting accounts and data on mainnet
  */
 describe('JupiterFs', function() {
-  this.timeout(10000)
-
   assert(process.env.JUPITER_ADDRESS, 'JUPITER_ADDRESS env variable is not set')
   assert(
     process.env.JUPITER_PASSPHRASE,
     'JUPITER_PASSPHRASE env variable is not set'
   )
 
-  // const fs = JupiterFs({ server: 'http://localhost:7876' })
+  // const fs = JupiterFs({ server: 'http://localhost:6876' })
   const jupFs = JupiterFs({
-    server: process.env.JUPITER_SERVER || 'https://jpr4.gojupiter.tech',
+    server: process.env.JUPITER_SERVER || 'http://104.131.166.136:6876/test',
     address: process.env.JUPITER_ADDRESS,
     passphrase: process.env.JUPITER_PASSPHRASE,
   })
@@ -40,7 +38,7 @@ describe('JupiterFs', function() {
     })
   })
 
-  describe('#ls()', function() {
+  xdescribe('#ls()', function() {
     it(`should fetch a list of files for a jupiter account`, async () => {
       const files = await jupFs.ls()
       assert.strictEqual(files instanceof Array, true)
@@ -50,9 +48,10 @@ describe('JupiterFs', function() {
   describe('#writeFile()', function() {
     it(`should write a file to a jupiter account without error`, async () => {
       const fileData = await fs.promises.readFile(
-        path.join(__dirname, 'JupiterFs.ts'),
+        path.join(__dirname, '../testFiles/medium.jpg'),
         { encoding: null }
       )
+      console.log("filename " + testFilename);
       const res = await jupFs.writeFile(testFilename, fileData, assert.fail)
       assert.strictEqual(res.fileName, testFilename)
       assert.strictEqual(res.txns.length > 0, true)
@@ -61,9 +60,10 @@ describe('JupiterFs', function() {
 
   describe('#getFile()', function() {
     it(`should get the binary data for a file specified`, async () => {
+      console.log("filename " + testFilename);
       const fileData = await jupFs.getFile({ name: testFilename })
       const origFileData = await fs.promises.readFile(
-        path.join(__dirname, 'JupiterFs.ts'),
+        path.join(__dirname, '../testFiles/medium.jpg'),
         'utf-8'
       )
       assert.strictEqual(fileData instanceof Buffer, true)
