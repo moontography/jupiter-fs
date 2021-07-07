@@ -16,7 +16,7 @@ export default function JupiterFs({
 }: any): any {
   // const jupServer = server || 'https://fs.jup.io'
   const jupServer = server || ''
-  feeNQT = feeNQT || 150
+  feeNQT = feeNQT || 400
   // Quantity to found the binary client when doesnt have enought founds
   minimumFndrAccountBalance = minimumFndrAccountBalance || 1000000
   minimumUserAccountBalance = minimumUserAccountBalance || 2000000
