@@ -3,6 +3,7 @@ import BigNumber from 'bignumber.js'
 import { Readable } from 'stream'
 import { v1 as uuidv1 } from 'uuid'
 import JupiterClient, { generatePassphrase } from 'jupiter-node-sdk'
+import zlib from 'zlib'
 
 export default function JupiterFs({
   server,
@@ -15,12 +16,14 @@ export default function JupiterFs({
 }: any): any {
   // const jupServer = server || 'https://fs.jup.io'
   const jupServer = server || ''
-  feeNQT = feeNQT || 6500
-  minimumFndrAccountBalance = minimumFndrAccountBalance || 100000
-  minimumUserAccountBalance = minimumUserAccountBalance || 200000
+  feeNQT = feeNQT || 150
+  // Quantity to found the binary client when doesnt have enought founds
+  minimumFndrAccountBalance = minimumFndrAccountBalance || 1000000
+  minimumUserAccountBalance = minimumUserAccountBalance || 2000000
 
   // Chunk size to split the file to upload
-  const CHUNK_SIZE_PATTERN = /.{1,20000}/g;
+  // Max lengh in Jupiter is 43008 bytes per encrypted message
+  const CHUNK_SIZE_PATTERN = /.{1,40000}/g;
 
   return {
     key: `jupiter-fs`,
@@ -89,6 +92,8 @@ export default function JupiterFs({
       // Get balance for binary client
       const balanceJup = await this.client.getBalance(targetAddress)
       if (
+        // if binary client doesnt have money or is less than minimumFndrAccountBalance
+        // then send money to support file upload 
         !balanceJup ||
         new BigNumber(balanceJup).lt(
           new BigNumber(
@@ -184,11 +189,12 @@ export default function JupiterFs({
       data: Buffer,
       errorCallback?: (err: Error) => {}
     ) {
-      await this.getOrCreateBinaryAddress()
-      // TODO: compress the binary data before to base64 encode
-      const encodedFileData = data.toString('base64');
+      await this.getOrCreateBinaryAddress()    
 
+      // compress the binary data before to convert to base64
+      const encodedFileData = zlib.deflateSync(Buffer.from(data)).toString('base64')
       const chunks = encodedFileData.match(CHUNK_SIZE_PATTERN)
+      
       assert(chunks, `we couldn't split the data into chunks`)
 
       const dataTxns: string[] = await Promise.all(
@@ -308,8 +314,7 @@ export default function JupiterFs({
       }
 
       const base64Strings = await getBase64Strings()
-      // TODO uncompress before base64 decode
-      return Buffer.from(base64Strings.join(''), 'base64')
+      return zlib.inflateSync(Buffer.from(base64Strings.join(''), 'base64'))
     },
 
     async getFileStream({ name, id }: any): Promise<Readable> {
